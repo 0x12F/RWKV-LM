@@ -5,7 +5,7 @@
 import numpy as np
 np.set_printoptions(precision=4, suppress=True, linewidth=200)
 import types, torch, copy, time
-from typing import List
+from typing import List, Tuple
 torch.backends.cudnn.benchmark = True
 torch.backends.cudnn.allow_tf32 = True
 torch.backends.cuda.matmul.allow_tf32 = True
@@ -196,6 +196,7 @@ def sample_logits(logits, temperature:float=1.0, top_p:float=1.0, top_k:int=0):
     if temperature != 1.0:
         probs = probs ** (1.0 / temperature)
 
+
     return torch.multinomial(probs, num_samples=1).item()
 
 ########################################################################################################
@@ -305,3 +306,42 @@ for d in todo:
     xacc += 1 if correct else 0
     if xcnt % 10 == 0 or xcnt == len(todo):
         print(xcnt, 'ppl', round(math.exp(-xsum / xcnt), 2), 'acc', round(xacc/xcnt*100, 2))
+
+########################################################################################################
+
+@torch.jit.script
+def optimized_matrix_multiply(x: torch.Tensor, w: torch.Tensor) -> torch.Tensor:
+    if x.dim() == 2:
+        x = x.unsqueeze(0)
+    batch_size, seq_len, hidden_size = x.size()
+    x = x.reshape(-1, hidden_size)
+    out = torch.mm(x, w)
+    out = out.view(batch_size, seq_len, -1)
+    return out
+
+def optimize_state_matrices(state: List[torch.Tensor]) -> List[torch.Tensor]:
+    optimized_state = []
+    for tensor in state:
+        if tensor.dtype == torch.float32:
+            tensor = tensor.half()
+        
+        tensor = tensor.squeeze()
+        
+        # Contiguous memory layout
+        if not tensor.is_contiguous():
+            tensor = tensor.contiguous()
+            
+        optimized_state.append(tensor)
+    return optimized_state
+
+def optimized_batch_processing(x: torch.Tensor, state: List[torch.Tensor], 
+                             layer_id: int, head_size: int) -> Tuple[torch.Tensor, List[torch.Tensor]]:
+    # Batch size optimization
+    batch_size = x.size(0)
+    if batch_size > 1:
+        # Reshape for parallel processing
+        x = x.view(-1, x.size(-1))
+        state = [s.repeat(batch_size, 1, 1) if s.dim() == 2 else s.repeat(batch_size, 1) 
+                for s in state]
+    
+    return x, state
