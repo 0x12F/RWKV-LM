@@ -1,6 +1,6 @@
 # RWKV: Parallelizable RNN with Transformer-level LLM Performance (pronounced as "RwaKuv" (rʌkuv in IPA), from 4 major params: R W K V)
 
-RWKV website: https://rwkv.com (with 30+ RWKV-related papers)
+RWKV website: https://rwkv.com (with 60+ RWKV-related papers)
 
 RWKV twitter: https://twitter.com/BlinkDL_AI (lastest news)
 
@@ -46,7 +46,13 @@ RWKV-5/6 Eagle/Finch paper: https://arxiv.org/abs/2404.05892
 
 Chat demo code: https://github.com/BlinkDL/ChatRWKV/blob/main/API_DEMO_CHAT.py
 
-RWKV-7 demo code: https://github.com/BlinkDL/RWKV-LM/tree/main/RWKV-v7
+**RWKV-7 demo code**: https://github.com/BlinkDL/RWKV-LM/tree/main/RWKV-v7
+
+https://github.com/BlinkDL/RWKV-LM/blob/main/RWKV-v7/rwkv_v7_demo.py (GPT-like mode)
+
+https://github.com/BlinkDL/RWKV-LM/blob/main/RWKV-v7/rwkv_v7_demo_rnn.py (RNN mode)
+
+https://github.com/BlinkDL/RWKV-LM/blob/main/RWKV-v7/rwkv_v7_demo_fast.py (Both mode, fastest)
 
 RWKV-6 demo code: https://github.com/BlinkDL/RWKV-LM/blob/main/RWKV-v5/rwkv_v6_demo.py
 
@@ -57,6 +63,54 @@ RWKV-6 demo code: https://github.com/BlinkDL/ChatRWKV/blob/main/RWKV_v6_demo.py
 For reference, use python 3.10+, torch 2.5+, cuda 12.5+, latest deepspeed, but **keep pytorch-lightning==1.9.5**
 
 **Train RWKV-7**: use /RWKV-v5/ and use --my_testing "x070" in demo-training-prepare.sh and demo-training-run.sh
+
+**Train RWKV-7, much cleaner code**: https://github.com/BlinkDL/RWKV-LM/tree/main/RWKV-v7/train_temp
+
+RWKV-7 weight example for 1.5B (L24-D2048, vocab 65536):
+| name                | shape         | comment      | initialization  |
+|---------------------|---------------|--------------|-----------------|
+| emb.weight          | [65536, 2048] | wdecay       | see code        |
+| blocks.0.ln0.weight | [2048]        | for layer 0  | 1               |
+| blocks.0.ln0.bias   | [2048]        | for layer 0  | 0               |
+|                     |               |              |                 |
+| blocks.*.ln1.weight | [2048]        |              | 1               |
+| blocks.*.ln1.bias   | [2048]        |              | 0               |
+| blocks.*.att.x_r    | [1, 1, 2048]  |              | see code        |
+| blocks.*.att.x_w    | [1, 1, 2048]  |              | see code        |
+| blocks.*.att.x_k    | [1, 1, 2048]  |              | see code        |
+| blocks.*.att.x_v    | [1, 1, 2048]  |              | see code        |
+| blocks.*.att.x_a    | [1, 1, 2048]  |              | see code        |
+| blocks.*.att.x_g    | [1, 1, 2048]  |              | see code        |
+| blocks.*.att.w0     | [1, 1, 2048]  | lr 2x        | see code        |
+| blocks.*.att.w1     | [2048, 96]    |              | 0               |
+| blocks.*.att.w2     | [96, 2048]    |              | see code        |
+| blocks.*.att.a0     | [1, 1, 2048]  |              | 0               |
+| blocks.*.att.a1     | [2048, 96]    |              | 0               |
+| blocks.*.att.a2     | [96, 2048]    |              | see code        |
+| blocks.*.att.v0     | [1, 1, 2048]  | for layer 1+ | 1               |
+| blocks.*.att.v1                | [2048, 64]   | for layer 1+ | 0         |
+| blocks.*.att.v2                | [64, 2048]   | for layer 1+ | see code  |
+| blocks.*.att.g1                | [2048, 256]  |              | 0         |
+| blocks.*.att.g2                | [256, 2048]  |              | see code  |
+| blocks.*.att.k_k               | [1, 1, 2048] |              | 1         |
+| blocks.*.att.k_a               | [1, 1, 2048] |              | 1         |
+| blocks.*.att.r_k               | [32, 64]     |              | 0         |
+| blocks.*.att.receptance.weight | [2048, 2048] | wdecay       | see code  |
+| blocks.*.att.key.weight        | [2048, 2048] | wdecay       | see code  |
+| blocks.*.att.value.weight      | [2048, 2048] | wdecay       | see code  |
+| blocks.*.att.output.weight     | [2048, 2048] | wdecay       | 0         |
+| blocks.*.att.ln_x.weight       | [2048]       |              | see code  |
+| blocks.*.att.ln_x.bias         | [2048]       |              | 0         |
+|                                |              |              |           |
+| blocks.*.ln2.weight            | [2048]       |              | 1         |
+| blocks.*.ln2.bias              | [2048]       |              | 0         |
+| blocks.*.ffn.x_k               | [1, 1, 2048] |              | see code  |
+| blocks.*.ffn.key.weight        | [8192, 2048] | wdecay       | see code  |
+| blocks.*.ffn.value.weight      | [2048, 8192] | wdecay       | 0         |
+|                                |              |              |           |
+| ln_out.weight | [2048]        |        | 1         |
+| ln_out.bias   | [2048]        |        | 0         |
+| head.weight   | [65536, 2048] | wdecay | see code  |
 
 **Train RWKV-6**: use /RWKV-v5/ and use --my_testing "x060" in demo-training-prepare.sh and demo-training-run.sh
 
@@ -77,7 +131,7 @@ You can run your model using https://pypi.org/project/rwkv/ (use "rwkv_vocab_v20
 
 Use https://github.com/BlinkDL/RWKV-LM/blob/main/RWKV-v5/make_data.py to prepare binidx data from jsonl, and compute "--my_exit_tokens" and "--magic_prime".
 
-Much faster tokenizer of large data: https://github.com/cahya-wirawan/json2bin
+Much faster tokenizer of large data: https://github.com/cahya-wirawan/json2bin https://github.com/cahya-wirawan/rwkv-tokenizer https://github.com/m8than/RWKV-World-Tokenizer-CPP
 
 The "epoch" in train.py is "mini-epoch" (not real epoch. only for convenience), and 1 mini-epoch = 40320 * ctx_len tokens.
 
